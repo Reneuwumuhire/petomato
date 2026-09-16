@@ -101,7 +101,10 @@ fn main() {
                         // Hide-on-blur only for a genuine click-away — never when our
                         // own fullscreen overlay (strict break / blocker) stole focus,
                         // or the popover would vanish for good once the overlay closes.
-                        if !windows::is_pinned() && !windows::overlay_active(wc.app_handle()) {
+                        if !windows::is_pinned()
+                            && !windows::overlay_active(wc.app_handle())
+                            && !windows::strict_focus_active(wc.app_handle())
+                        {
                             let _ = wc.hide();
                         }
                     }

@@ -116,6 +116,14 @@ pub fn overlay_active(app: &AppHandle) -> bool {
     })
 }
 
+/// The blocker is created asynchronously, so the main popover can blur before
+/// the overlay becomes visible. Keep it alive for the whole strict focus phase.
+pub fn strict_focus_active(app: &AppHandle) -> bool {
+    let state = app.state::<AppState>();
+    let e = state.engine.lock().unwrap();
+    e.settings.strict_mode && matches!(e.phase, Phase::Focus) && matches!(e.status, Status::Running)
+}
+
 /// True while the site-blocker overlay is on screen. Used by the focus guard to
 /// avoid a flicker loop: when our own overlay grabs focus, Petomato becomes the
 /// frontmost app, which would otherwise read as "navigated away" and hide it.

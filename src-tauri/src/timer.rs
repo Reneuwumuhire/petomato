@@ -112,9 +112,15 @@ impl TimerEngine {
         self.total_ms = dur(&self.settings, self.phase);
         self.remaining_ms = self.total_ms;
 
-        let auto = completed && match self.phase {
-            Phase::Focus => self.settings.auto_start_work,
-            _ => self.settings.auto_start_break,
+        // A manual skip should still continue when it skips a break. Completing a
+        // phase keeps the user's auto-start preferences.
+        let auto = if completed {
+            match self.phase {
+                Phase::Focus => self.settings.auto_start_work,
+                _ => self.settings.auto_start_break,
+            }
+        } else {
+            matches!(self.phase, Phase::Focus)
         };
         if auto { self.status = Status::Running; self.last_tick = Some(Instant::now()); }
         else { self.status = Status::Idle; self.last_tick = None; }
@@ -126,6 +132,20 @@ impl TimerEngine {
 fn dur(s: &Settings, phase: Phase) -> u64 {
     let m = match phase { Phase::Focus => s.focus_min, Phase::Short => s.short_min, Phase::Long => s.long_min };
     m as u64 * 60_000
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn skipping_break_starts_next_focus() {
+        let mut timer = TimerEngine::new(Settings::default(), 0);
+        timer.phase = Phase::Short;
+        timer.advance(false);
+        assert_eq!(timer.phase, Phase::Focus);
+        assert_eq!(timer.status, Status::Running);
+    }
 }
 
 /// Shared engine, registered via `app.manage(AppState{..})`.
