@@ -56,12 +56,12 @@ pub fn tasks_get(app: AppHandle) -> Vec<Task> { store::load_tasks(&app) }
 #[tauri::command]
 pub fn tasks_add(title: String, tag: String, est: u32, minutes: u32, app: AppHandle) -> Vec<Task> {
     let mut tasks = store::load_tasks(&app);
-    let order = tasks.iter().map(|t| t.order).max().map(|m| m + 1).unwrap_or(0);
-    tasks.push(Task {
+    tasks.insert(0, Task {
         id: new_id(), title, tag,
         minutes: minutes.max(1), est_pomodoros: est.max(1),
-        done_pomodoros: 0, completed: false, order,
+        done_pomodoros: 0, completed: false, order: 0,
     });
+    for (order, task) in tasks.iter_mut().enumerate() { task.order = order as i32; }
     store::save_tasks(&app, &tasks);
     let _ = app.emit("tasks-state", &tasks);
     tasks
