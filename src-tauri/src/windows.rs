@@ -140,9 +140,33 @@ pub fn show_main(app: &AppHandle) {
     if let Some(m) = app.get_webview_window("mini") { let _ = m.hide(); }
 }
 
-pub fn toggle_main(app: &AppHandle) {
-    if let Some(w) = app.get_webview_window("main") {
-        if w.is_visible().unwrap_or(false) { let _ = w.hide(); } else { show_main(app); }
+/// A tray click can blur the popover before its mouse-up opens it again.
+pub fn cursor_over_tray(win: &tauri::WebviewWindow) -> bool {
+    let Some(rect) = win.app_handle().tray_by_id("tray")
+        .and_then(|tray| tray.rect().ok().flatten()) else { return false };
+    let Ok(cursor) = win.cursor_position() else { return false };
+    let scale = win.scale_factor().unwrap_or(1.0);
+    point_in_rect(cursor, rect.position.to_physical::<f64>(scale), rect.size.to_physical::<f64>(scale))
+}
+
+fn point_in_rect(point: PhysicalPosition<f64>, origin: PhysicalPosition<f64>, size: tauri::PhysicalSize<f64>) -> bool {
+    point.x >= origin.x && point.x < origin.x + size.width
+        && point.y >= origin.y && point.y < origin.y + size.height
+}
+
+#[cfg(test)]
+mod tray_tests {
+    use super::*;
+
+    #[test]
+    fn tray_hit_test_uses_screen_coordinates_and_excludes_click_away() {
+        let origin = PhysicalPosition::new(-120.0, 40.0);
+        let size = tauri::PhysicalSize::new(80.0, 44.0);
+        assert!(point_in_rect(origin, origin, size));
+        assert!(point_in_rect(PhysicalPosition::new(-41.0, 83.0), origin, size));
+        for (x, y) in [(-121.0, 40.0), (-40.0, 40.0), (-100.0, 39.0), (-100.0, 84.0)] {
+            assert!(!point_in_rect(PhysicalPosition::new(x, y), origin, size));
+        }
     }
 }
 
