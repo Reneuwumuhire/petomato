@@ -9,7 +9,10 @@ mod store;
 mod timer;
 mod windows;
 
-use std::sync::Mutex;
+use std::{
+    sync::Mutex,
+    time::{Duration, Instant},
+};
 use tauri::{
     menu::{Menu, MenuItem, PredefinedMenuItem},
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
@@ -76,7 +79,9 @@ fn main() {
                 })
                 .on_tray_icon_event(|tray, event| {
                     if let TrayIconEvent::Click { button: MouseButton::Left, button_state: MouseButtonState::Up, .. } = event {
-                        windows::toggle_main(tray.app_handle()); // opens top-right
+                        if should_toggle_tray() {
+                            windows::toggle_main(tray.app_handle()); // opens top-right
+                        }
                     }
                 })
                 .build(app)?;
@@ -165,4 +170,33 @@ fn main() {
                 }
             }
         });
+}
+
+static LAST_TRAY_CLICK: Mutex<Option<Instant>> = Mutex::new(None);
+
+fn should_toggle_tray() -> bool {
+    let now = Instant::now();
+    let mut last = LAST_TRAY_CLICK.lock().unwrap();
+    let should_toggle = last
+        .map(|previous| now.duration_since(previous) >= Duration::from_millis(300))
+        .unwrap_or(true);
+    if should_toggle {
+        *last = Some(now);
+    }
+    should_toggle
+}
+
+#[cfg(test)]
+mod tests {
+    use super::should_toggle_tray;
+    use std::thread;
+    use std::time::Duration;
+
+    #[test]
+    fn ignores_rapid_tray_clicks() {
+        assert!(should_toggle_tray());
+        assert!(!should_toggle_tray());
+        thread::sleep(Duration::from_millis(310));
+        assert!(should_toggle_tray());
+    }
 }
